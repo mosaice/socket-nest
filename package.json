@@ -1,0 +1,26 @@
+{
+  "name": "socket-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node dist",
+    "prestart": "rm -rf dist && tsc",
+    "dev": "nodemon"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "socket.io": "^2.1.1",
+    "winston": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^10.3.6",
+    "@types/socket.io": "^1.4.36",
+    "@types/winston": "^2.3.9",
+    "ts-node": "^7.0.0",
+    "tslint": "^5.10.0",
+    "typescript": "^2.9.2"
+  }
+}
