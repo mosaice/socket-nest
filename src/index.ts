@@ -1,3 +1,4 @@
+import './modules/log';
 import { createServer } from 'http';
 import socket from 'socket.io';
 
@@ -20,6 +21,7 @@ io.sockets.on('connection', socket => {
   });
 });
 
-server.listen(3000, () => {
-  console.log('listen ', 3000);
+server.listen(process.env.PORT || 3000, () => {
+  console.log('listen ON', process.env.PORT || 3000);
+  console.log('NODE_ENV = ', process.env.NODE_ENV);
 });
