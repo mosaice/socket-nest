@@ -24,3 +24,6 @@ setup.js
 package-lock.json
 yarn.lock
 .DS_Store
+
+/src/config/secret*
+/log
