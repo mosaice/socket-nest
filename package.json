@@ -16,6 +16,7 @@
     "joi": "^13.5.2",
     "log4js": "^3.0.4",
     "nodemailer": "^4.6.7",
+    "redis": "^2.8.0",
     "socket.io": "^2.1.1",
     "winston": "^3.0.0"
   },
@@ -25,6 +26,7 @@
     "@types/log4js": "^2.3.5",
     "@types/node": "^10.5.6",
     "@types/nodemailer": "^4.6.2",
+    "@types/redis": "^2.8.6",
     "@types/socket.io": "^1.4.36",
     "@types/winston": "^2.3.9",
     "ts-node": "^7.0.0",
