@@ -1,6 +1,9 @@
 import './modules/log';
 import { createServer } from 'http';
 import socket from 'socket.io';
+import { values } from 'lodash';
+import * as events from './modules/events';
+import * as middlewares from './modules/middleware';
 
 const server = createServer();
 
@@ -15,10 +18,9 @@ const io = socket(server, {
 });
 
 io.sockets.on('connection', socket => {
-  socket.on('events', data => {
-    console.log(data);
-    socket.emit('events', 'ok');
-  });
+  socket.join('public', () => console.log('new socket'));
+  values(middlewares).forEach(middware => socket.use(middware));
+  values(events).forEach(func => func(socket));
 });
 
 server.listen(process.env.PORT || 3000, () => {

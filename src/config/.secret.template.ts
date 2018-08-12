@@ -8,3 +8,5 @@ export const mail = {
     pass: 'your password'
   }
 };
+
+export const mailNotify = '';
