@@ -1,7 +1,7 @@
 export const mail = {
   pool: true,
-  host: 'your host',
-  port: 'your port',
+  host: 'smtp.163.com',
+  port: 465,
   secure: true,
   auth: {
     user: 'your email',

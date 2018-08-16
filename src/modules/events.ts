@@ -7,7 +7,7 @@ export const userConnect = (socket: Socket) => {
     redis.hset('connectedUsers', socket.id, JSON.stringify(data), print);
     socket.emit('userConnect', data);
 
-    redis.hvals('connectedUsers', (err, userString) => {
+    redis.hvals('connectedUsers', async (err, userString) => {
       if (err) {
         console.error(err);
       }
@@ -15,6 +15,9 @@ export const userConnect = (socket: Socket) => {
       socket.emit('getAllUsers', users);
       socket.to('public').emit('getAllUsers', users);
       socket.to('public').emit('userJoin', data.name);
+      const len = await redis.llenAsync('activeSongs');
+      const songs = await redis.lrangeAsync('activeSongs', 0, len);
+      socket.emit('syncSongs', songs);
     });
   });
 };
@@ -29,7 +32,11 @@ export const disconnect = (socket: Socket) => {
 export const selectSong = (socket: Socket) => {
   socket.on('selectSong', async (data: Song) => {
     // TODO: 点歌逻辑
-    console.log(data);
+    redis.rpush('activeSongs', JSON.stringify(data));
+    const len = await redis.llenAsync('activeSongs');
+    const songs = await redis.lrangeAsync('activeSongs', 0, len);
+    socket.emit('syncSongs', songs);
+    socket.to('public').emit('syncSongs', songs);
   });
 };
 
