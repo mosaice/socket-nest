@@ -18,7 +18,7 @@ const io = socket(server, {
 io.sockets.on('connection', socket => {
   // console.log(io.sockets);
   socket.join('public');
-  initPlay(socket);
+  // initPlay(socket);
   values(middlewares).forEach(middware => socket.use(middware));
   values(other).forEach(func => func(socket));
 });

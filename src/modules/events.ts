@@ -109,12 +109,12 @@ export const error = (socket: Socket) => {
 
 process.on('exit', code => {
   console.log(`即将退出，退出码：${code}`);
-  if (currentSong) {
-    const ex = currentSong.duration + currentSong.playTime! - Date.now();
-    if (ex > 0) {
-      redis.set('playSong', JSON.stringify(currentSong), 'EX', ex / 1000);
-    }
-  }
+  // if (currentSong) {
+  //   const ex = currentSong.duration + currentSong.playTime! - Date.now();
+  //   if (ex > 0) {
+  //     redis.set('playSong', JSON.stringify(currentSong), 'EX', ex / 1000);
+  //   }
+  // }
 });
 
 // const returnUsers = (socket:Socket)
