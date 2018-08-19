@@ -20,7 +20,6 @@ export const validate: Middleware = (packet, next) => {
   const validator = schemas[type];
   if (validator) {
     const { error, value } = Joi.validate(data, validator);
-    console.log(error);
     if (error) {
       return next(
         new Error(

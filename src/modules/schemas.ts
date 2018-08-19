@@ -3,7 +3,8 @@ import Joi, { Schema } from 'joi';
 const user = Joi.object().keys({
   name: Joi.string().required(),
   avatarColor: Joi.string().required(),
-  avatarText: Joi.string().required()
+  avatarText: Joi.string().required(),
+  hash: Joi.string().required()
 });
 
 const song = Joi.object().keys({

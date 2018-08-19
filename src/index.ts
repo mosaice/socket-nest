@@ -18,7 +18,8 @@ const io = socket(server, {
 });
 
 io.sockets.on('connection', socket => {
-  socket.join('public', () => console.log('new socket'));
+  // console.log(io.sockets);
+  socket.join('public');
   values(middlewares).forEach(middware => socket.use(middware));
   values(events).forEach(func => func(socket));
 });

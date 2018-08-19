@@ -1,60 +1,98 @@
 import { Socket } from 'socket.io';
 import redis, { print } from './redis';
-import { values, uniq } from 'lodash';
+import { uniq } from 'lodash';
 import { Song } from '../types';
+
+let isPlaying = false;
+let currentSong: Song | undefined;
+let timer: NodeJS.Timer;
 export const userConnect = (socket: Socket) => {
   socket.on('userConnect', async data => {
-    redis.hset('connectedUsers', socket.id, JSON.stringify(data), print);
+    redis.sadd('connectedUsers', JSON.stringify(data));
+    redis.hset('socketUser', socket.id, JSON.stringify(data));
     socket.emit('userConnect', data);
-
-    redis.hvals('connectedUsers', async (err, userString) => {
-      if (err) {
-        console.error(err);
-      }
-      const users = uniq(userString).map(s => JSON.parse(s));
-      socket.emit('getAllUsers', users);
-      socket.to('public').emit('getAllUsers', users);
-      socket.to('public').emit('userJoin', data.name);
-      const len = await redis.llenAsync('activeSongs');
-      const songs = await redis.lrangeAsync('activeSongs', 0, len);
-      socket.emit('syncSongs', songs);
-    });
+    socket.to('public').emit('userJoin', data.name);
+    syncUser(socket);
+    syncSongs(socket, false);
+    if (currentSong && isPlaying) {
+      socket.emit('playSong', currentSong);
+    }
   });
 };
 
 export const disconnect = (socket: Socket) => {
-  socket.on('disconnect', async data => {
-    // console.log('disconnect', socket.id);
-    redis.hdel('connectedUsers', socket.id, print);
+  socket.on('disconnect', async () => {
+    const userString = await redis.hgetAsync('socketUser', socket.id);
+    redis.hdel('socketUser', socket.id);
+    if (userString) {
+      await redis.sremAsync('connectedUsers', userString);
+      socket.to('public').emit('userLevel', JSON.parse(userString).name);
+    }
+    syncUser(socket);
   });
 };
 
 export const selectSong = (socket: Socket) => {
   socket.on('selectSong', async (data: Song) => {
-    // TODO: 点歌逻辑
     redis.rpush('activeSongs', JSON.stringify(data));
-    const len = await redis.llenAsync('activeSongs');
-    const songs = await redis.lrangeAsync('activeSongs', 0, len);
-    socket.emit('syncSongs', songs);
-    socket.to('public').emit('syncSongs', songs);
+    if (!isPlaying) {
+      autoPlay(socket);
+      isPlaying = true;
+    } else {
+      syncSongs(socket);
+    }
   });
 };
 
-// export const getAllUsers = (socket: Socket) => {
-//   socket.on('getAllUsers', () => {
-//     redis.hgetall('connectedUsers', (err, data) => {
-//       if (err) {
-//         console.error(err);
-//       }
-//       const users = uniq(values(data)).map(s => JSON.parse(s));
-//       socket.emit('getAllUsers', users);
-//     });
-//   });
-// };
+export const nextSong = (socket: Socket) => {
+  socket.on('nextSong', async () => {
+    if (isPlaying && timer) {
+      clearTimeout(timer);
+      autoPlay(socket);
+    }
+  });
+};
+
+const autoPlay = async (socket: Socket) => {
+  const songString = await redis.lpopAsync('activeSongs');
+
+  const song: Song | undefined = songString
+    ? JSON.parse(songString)
+    : undefined;
+  if (song) {
+    song.playTime = Date.now();
+    currentSong = song;
+  }
+  socket.emit('playSong', song);
+  socket.to('public').emit('playSong', song);
+  syncSongs(socket);
+  if (!song) {
+    isPlaying = false;
+    currentSong = undefined;
+  } else {
+    timer = setTimeout(() => autoPlay(socket), song.duration + 3000);
+  }
+};
+
+const syncSongs = async (socket: Socket, all: boolean = true) => {
+  const len = await redis.llenAsync('activeSongs');
+  const songs = await redis.lrangeAsync('activeSongs', 0, len);
+  socket.emit('syncSongs', songs);
+  if (all) {
+    socket.to('public').emit('syncSongs', songs);
+  }
+};
+
+const syncUser = async (socket: Socket) => {
+  const userString: string[] = await redis.smembersAsync('connectedUsers');
+  const users = userString.map(s => JSON.parse(s));
+  socket.emit('getAllUsers', users);
+  socket.to('public').emit('getAllUsers', users);
+};
 
 export const error = (socket: Socket) => {
   socket.on('error', data => {
-    console.log(data);
+    // console.log(data);
   });
 };
 

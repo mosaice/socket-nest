@@ -11,4 +11,5 @@ export type Song = {
   album: string;
   duration: number;
   url: string;
+  playTime?: number;
 };

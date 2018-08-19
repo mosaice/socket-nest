@@ -7,6 +7,10 @@ interface PromisifyRedis extends redis.RedisClient {
   hsetAsync(...args: any[]): Promise<any>;
   llenAsync(...args: any[]): Promise<any>;
   lrangeAsync(...args: any[]): Promise<any>;
+  lpopAsync(...args: any[]): Promise<any>;
+  smembersAsync(...args: any[]): Promise<any>;
+  hgetAsync(...args: any[]): Promise<any>;
+  sremAsync(...args: any[]): Promise<any>;
 }
 
 bluebird.promisifyAll(redis);
