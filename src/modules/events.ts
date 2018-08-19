@@ -1,6 +1,6 @@
 import { Socket } from 'socket.io';
 import redis, { print } from './redis';
-import { uniq } from 'lodash';
+import https from 'https';
 import { Song } from '../types';
 
 let currentSong: Song | undefined;
@@ -49,12 +49,17 @@ export const disconnect = (socket: Socket) => {
 
 export const selectSong = (socket: Socket) => {
   socket.on('selectSong', async (data: Song) => {
-    redis.rpush('activeSongs', JSON.stringify(data));
-    if (!currentSong) {
-      autoPlay(socket);
-    } else {
-      syncSongs(socket);
-    }
+    https.get(data.url, resp => {
+      if (resp.headers.location) {
+        data.url = resp.headers.location.replace('http://', 'https://');
+      }
+      redis.rpush('activeSongs', JSON.stringify(data));
+      if (!currentSong) {
+        autoPlay(socket);
+      } else {
+        syncSongs(socket);
+      }
+    });
   });
 };
 
