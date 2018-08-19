@@ -4,14 +4,12 @@ import socket from 'socket.io';
 import { values } from 'lodash';
 import * as events from './modules/events';
 import * as middlewares from './modules/middleware';
-
+const { initPlay, ...other } = events;
 const server = createServer();
 
 const io = socket(server, {
-  // path: '/test',
   serveClient: false,
   origins: '*:*',
-  // below are engine.IO options
   pingInterval: 10000,
   pingTimeout: 5000,
   cookie: true
@@ -20,8 +18,9 @@ const io = socket(server, {
 io.sockets.on('connection', socket => {
   // console.log(io.sockets);
   socket.join('public');
+  initPlay(socket);
   values(middlewares).forEach(middware => socket.use(middware));
-  values(events).forEach(func => func(socket));
+  values(other).forEach(func => func(socket));
 });
 
 server.listen(process.env.PORT || 3000, () => {

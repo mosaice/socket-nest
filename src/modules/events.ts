@@ -3,9 +3,24 @@ import redis, { print } from './redis';
 import { uniq } from 'lodash';
 import { Song } from '../types';
 
-let isPlaying = false;
 let currentSong: Song | undefined;
 let timer: NodeJS.Timer;
+
+export const initPlay = (socket: Socket) => {
+  // redis.get('playSong', (err, data) => {
+  //   if (!err && data) {
+  //     currentSong = JSON.parse(data);
+  //     const nextTime =
+  //       currentSong!.duration + currentSong!.playTime! - Date.now();
+  //     timer = setTimeout(() => autoPlay(socket), nextTime + 3000);
+  //   } else {
+  //     autoPlay(socket);
+  //   }
+  // });
+
+  autoPlay(socket);
+};
+
 export const userConnect = (socket: Socket) => {
   socket.on('userConnect', async data => {
     redis.sadd('connectedUsers', JSON.stringify(data));
@@ -14,7 +29,7 @@ export const userConnect = (socket: Socket) => {
     socket.to('public').emit('userJoin', data.name);
     syncUser(socket);
     syncSongs(socket, false);
-    if (currentSong && isPlaying) {
+    if (currentSong) {
       socket.emit('playSong', currentSong);
     }
   });
@@ -35,9 +50,8 @@ export const disconnect = (socket: Socket) => {
 export const selectSong = (socket: Socket) => {
   socket.on('selectSong', async (data: Song) => {
     redis.rpush('activeSongs', JSON.stringify(data));
-    if (!isPlaying) {
+    if (!currentSong) {
       autoPlay(socket);
-      isPlaying = true;
     } else {
       syncSongs(socket);
     }
@@ -46,7 +60,7 @@ export const selectSong = (socket: Socket) => {
 
 export const nextSong = (socket: Socket) => {
   socket.on('nextSong', async () => {
-    if (isPlaying && timer) {
+    if (currentSong && timer) {
       clearTimeout(timer);
       autoPlay(socket);
     }
@@ -67,7 +81,6 @@ const autoPlay = async (socket: Socket) => {
   socket.to('public').emit('playSong', song);
   syncSongs(socket);
   if (!song) {
-    isPlaying = false;
     currentSong = undefined;
   } else {
     timer = setTimeout(() => autoPlay(socket), song.duration + 3000);
@@ -91,9 +104,17 @@ const syncUser = async (socket: Socket) => {
 };
 
 export const error = (socket: Socket) => {
-  socket.on('error', data => {
-    // console.log(data);
-  });
+  socket.on('error', data => {});
 };
+
+process.on('exit', code => {
+  console.log(`即将退出，退出码：${code}`);
+  if (currentSong) {
+    const ex = currentSong.duration + currentSong.playTime! - Date.now();
+    if (ex > 0) {
+      redis.set('playSong', JSON.stringify(currentSong), 'EX', ex / 1000);
+    }
+  }
+});
 
 // const returnUsers = (socket:Socket)
