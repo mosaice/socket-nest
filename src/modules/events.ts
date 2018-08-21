@@ -1,7 +1,7 @@
 import { Socket } from 'socket.io';
 import redis, { print } from './redis';
 import https from 'https';
-import { Song } from '../types';
+import { Song, Message } from '../types';
 
 let currentSong: Song | undefined;
 let timer: NodeJS.Timer;
@@ -28,6 +28,7 @@ export const userConnect = (socket: Socket) => {
     socket.emit('userConnect', data);
     socket.to('public').emit('userJoin', data.name);
     syncUser(socket);
+    syncMessage(socket);
     syncSongs(socket, false);
     if (currentSong) {
       socket.emit('playSong', currentSong);
@@ -72,6 +73,27 @@ export const nextSong = (socket: Socket) => {
   });
 };
 
+export const sendMessage = (socket: Socket) => {
+  socket.on('sendMessage', async (message: Message) => {
+    const msg = { ...message, time: new Date().toLocaleString() };
+    redis.lpush('chatMessage', JSON.stringify(msg));
+    socket.emit('sendMessage', msg);
+    socket.to('public').emit('sendMessage', msg);
+  });
+};
+
+export const syncMessageEvent = (socket: Socket) => {
+  socket.on('syncMessage', async (pos: number) => {
+    let len = await redis.llenAsync('chatMessage');
+    if (pos >= len) {
+      return;
+    }
+    const end = pos + 20 < len ? pos + 20 : len;
+    const msgs = await redis.lrangeAsync('chatMessage', pos, end);
+    socket.emit('syncMessage', msgs.reverse());
+  });
+};
+
 const autoPlay = async (socket: Socket) => {
   const songString = await redis.lpopAsync('activeSongs');
 
@@ -99,6 +121,13 @@ const syncSongs = async (socket: Socket, all: boolean = true) => {
   if (all) {
     socket.to('public').emit('syncSongs', songs);
   }
+};
+
+const syncMessage = async (socket: Socket) => {
+  let len = await redis.llenAsync('chatMessage');
+  len = len > 20 ? 20 : len;
+  const msgs = await redis.lrangeAsync('chatMessage', 0, len);
+  socket.emit('syncMessage', msgs.reverse());
 };
 
 const syncUser = async (socket: Socket) => {

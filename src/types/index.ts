@@ -13,3 +13,8 @@ export type Song = {
   url: string;
   playTime?: number;
 };
+
+export type Message = {
+  user: User;
+  message: string;
+};
