@@ -6,7 +6,7 @@ import * as events from './modules/events';
 import * as middlewares from './modules/middleware';
 const { initPlay, ...other } = events;
 const server = createServer();
-
+let init = false;
 const io = socket(server, {
   serveClient: false,
   origins: '*:*',
@@ -18,7 +18,10 @@ const io = socket(server, {
 io.sockets.on('connection', socket => {
   // console.log(io.sockets);
   socket.join('public');
-  // initPlay(socket);
+  if (!init) {
+    initPlay(socket);
+    init = true;
+  }
   values(middlewares).forEach(middware => socket.use(middware));
   values(other).forEach(func => func(socket));
 });

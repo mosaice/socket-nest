@@ -36,13 +36,25 @@ export const userConnect = (socket: Socket) => {
   });
 };
 
+export const userLeave = (socket: Socket) => {
+  socket.on('userLeave', async () => {
+    const userString = await redis.hgetAsync('socketUser', socket.id);
+    redis.hdel('socketUser', socket.id);
+    if (userString) {
+      await redis.sremAsync('connectedUsers', userString);
+      socket.to('public').emit('userLeave', JSON.parse(userString).name);
+    }
+    syncUser(socket);
+  });
+};
+
 export const disconnect = (socket: Socket) => {
   socket.on('disconnect', async () => {
     const userString = await redis.hgetAsync('socketUser', socket.id);
     redis.hdel('socketUser', socket.id);
     if (userString) {
       await redis.sremAsync('connectedUsers', userString);
-      socket.to('public').emit('userLevel', JSON.parse(userString).name);
+      socket.to('public').emit('userLeave', JSON.parse(userString).name);
     }
     syncUser(socket);
   });
@@ -84,11 +96,11 @@ export const sendMessage = (socket: Socket) => {
 
 export const syncMessageEvent = (socket: Socket) => {
   socket.on('syncMessage', async (pos: number) => {
-    let len = await redis.llenAsync('chatMessage');
+    const len = await redis.llenAsync('chatMessage');
     if (pos >= len) {
       return;
     }
-    const end = pos + 20 < len ? pos + 20 : len;
+    const end = pos + 10 < len ? pos + 10 : len;
     const msgs = await redis.lrangeAsync('chatMessage', pos, end);
     socket.emit('syncMessage', msgs.reverse());
   });
@@ -125,7 +137,7 @@ const syncSongs = async (socket: Socket, all: boolean = true) => {
 
 const syncMessage = async (socket: Socket) => {
   let len = await redis.llenAsync('chatMessage');
-  len = len > 20 ? 20 : len;
+  len = len > 10 ? 10 : len;
   const msgs = await redis.lrangeAsync('chatMessage', 0, len);
   socket.emit('syncMessage', msgs.reverse());
 };
