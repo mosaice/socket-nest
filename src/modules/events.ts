@@ -106,12 +106,11 @@ export const syncMessageEvent = (socket: Socket) => {
     if (pos >= len) {
       return;
     }
-    const userString = await redis.hgetAsync('socketUser', socket.id);
     const end = pos + 10 < len ? pos + 10 : len;
     let msgs = await redis.lrangeAsync('chatMessage', pos, end);
     msgs = msgs.reverse();
     socket.emit('syncMessage', msgs);
-    info('syncMessage', JSON.stringify(msgs), socket);
+    info('syncMessage', `len: ${len} pos: ${pos}`, socket);
   });
 };
 
@@ -143,7 +142,7 @@ const syncSongs = async (socket: Socket, all: boolean = true) => {
   if (all) {
     socket.to('public').emit('syncSongs', songs);
   }
-  info('syncSongs', JSON.stringify(songs), all ? undefined : socket);
+  // info('syncSongs', JSON.stringify(songs), all ? undefined : socket);
 };
 
 const syncMessage = async (socket: Socket) => {
@@ -152,7 +151,7 @@ const syncMessage = async (socket: Socket) => {
   let msgs = await redis.lrangeAsync('chatMessage', 0, len);
   msgs = msgs.reverse();
   socket.emit('syncMessage', msgs);
-  info('syncMessage', JSON.stringify(msgs), socket);
+  // info('syncMessage', JSON.stringify(msgs), socket);
 };
 
 const syncUser = async (socket: Socket) => {
