@@ -1,8 +1,9 @@
 import { Socket } from 'socket.io';
-import redis, { print } from './redis';
+import redis from './redis';
 import https from 'https';
 import { Song, Message } from '../types';
-
+import { db } from './nedb';
+import { errorLog, info } from './log';
 let currentSong: Song | undefined;
 let timer: NodeJS.Timer;
 
@@ -22,11 +23,12 @@ export const initPlay = (socket: Socket) => {
 };
 
 export const userConnect = (socket: Socket) => {
-  socket.on('userConnect', async data => {
+  socket.on('userConnect', async (data, fn) => {
     redis.sadd('connectedUsers', JSON.stringify(data));
     redis.hset('socketUser', socket.id, JSON.stringify(data));
-    socket.emit('userConnect', data);
+    fn();
     socket.to('public').emit('userJoin', data.name);
+    info('userJoin', data.name);
     syncUser(socket);
     syncMessage(socket);
     syncSongs(socket, false);
@@ -38,35 +40,30 @@ export const userConnect = (socket: Socket) => {
 
 export const userLeave = (socket: Socket) => {
   socket.on('userLeave', async () => {
-    const userString = await redis.hgetAsync('socketUser', socket.id);
-    redis.hdel('socketUser', socket.id);
-    if (userString) {
-      await redis.sremAsync('connectedUsers', userString);
-      socket.to('public').emit('userLeave', JSON.parse(userString).name);
-    }
-    syncUser(socket);
+    leave(socket, 'userLeave');
   });
 };
 
 export const disconnect = (socket: Socket) => {
   socket.on('disconnect', async () => {
-    const userString = await redis.hgetAsync('socketUser', socket.id);
-    redis.hdel('socketUser', socket.id);
-    if (userString) {
-      await redis.sremAsync('connectedUsers', userString);
-      socket.to('public').emit('userLeave', JSON.parse(userString).name);
-    }
-    syncUser(socket);
+    leave(socket, 'disconnect');
   });
 };
 
 export const selectSong = (socket: Socket) => {
   socket.on('selectSong', async (data: Song) => {
+    const userString = await redis.hgetAsync('socketUser', socket.id);
     https.get(data.url, resp => {
-      if (resp.headers.location) {
-        data.url = resp.headers.location.replace('http://', 'https://');
+      if (resp.headers.location === 'http://music.163.com/404') {
+        socket.emit('songError', data.name);
+        info('songError', data.name, socket);
+      } else {
+        if (resp.headers.location) {
+          data.url = resp.headers.location.replace('http://', 'https://');
+        }
+        redis.rpush('activeSongs', JSON.stringify(data));
       }
-      redis.rpush('activeSongs', JSON.stringify(data));
+
       if (!currentSong) {
         autoPlay(socket);
       } else {
@@ -89,8 +86,17 @@ export const sendMessage = (socket: Socket) => {
   socket.on('sendMessage', async (message: Message) => {
     const msg = { ...message, time: new Date().toLocaleString() };
     redis.lpush('chatMessage', JSON.stringify(msg));
+
+    db.insert(message, err => {
+      if (err) {
+        errorLog.error(
+          `[存储信息失败] ${new Date().toLocaleString()}:${err.message}`
+        );
+      }
+    });
     socket.emit('sendMessage', msg);
     socket.to('public').emit('sendMessage', msg);
+    info('sendMessage', JSON.stringify(msg));
   });
 };
 
@@ -100,9 +106,12 @@ export const syncMessageEvent = (socket: Socket) => {
     if (pos >= len) {
       return;
     }
+    const userString = await redis.hgetAsync('socketUser', socket.id);
     const end = pos + 10 < len ? pos + 10 : len;
-    const msgs = await redis.lrangeAsync('chatMessage', pos, end);
-    socket.emit('syncMessage', msgs.reverse());
+    let msgs = await redis.lrangeAsync('chatMessage', pos, end);
+    msgs = msgs.reverse();
+    socket.emit('syncMessage', msgs);
+    info('syncMessage', JSON.stringify(msgs), socket);
   });
 };
 
@@ -118,6 +127,7 @@ const autoPlay = async (socket: Socket) => {
   }
   socket.emit('playSong', song);
   socket.to('public').emit('playSong', song);
+  info('playSong', JSON.stringify(song));
   syncSongs(socket);
   if (!song) {
     currentSong = undefined;
@@ -133,13 +143,16 @@ const syncSongs = async (socket: Socket, all: boolean = true) => {
   if (all) {
     socket.to('public').emit('syncSongs', songs);
   }
+  info('syncSongs', JSON.stringify(songs), all ? undefined : socket);
 };
 
 const syncMessage = async (socket: Socket) => {
   let len = await redis.llenAsync('chatMessage');
   len = len > 10 ? 10 : len;
-  const msgs = await redis.lrangeAsync('chatMessage', 0, len);
-  socket.emit('syncMessage', msgs.reverse());
+  let msgs = await redis.lrangeAsync('chatMessage', 0, len);
+  msgs = msgs.reverse();
+  socket.emit('syncMessage', msgs);
+  info('syncMessage', JSON.stringify(msgs), socket);
 };
 
 const syncUser = async (socket: Socket) => {
@@ -147,10 +160,30 @@ const syncUser = async (socket: Socket) => {
   const users = userString.map(s => JSON.parse(s));
   socket.emit('getAllUsers', users);
   socket.to('public').emit('getAllUsers', users);
+  info('getAllUsers', JSON.stringify(users));
+};
+
+const leave = async (socket: Socket, type: 'disconnect' | 'userLeave') => {
+  const userString = await redis.hgetAsync('socketUser', socket.id);
+  redis.hdel('socketUser', socket.id);
+  if (userString) {
+    await redis.sremAsync('connectedUsers', userString);
+    const user = JSON.parse(userString);
+    socket.to('public').emit('userLeave', user.name);
+    info('userLeave', user.name);
+  }
+  syncUser(socket);
 };
 
 export const error = (socket: Socket) => {
-  socket.on('error', data => {});
+  socket.on('error', async err => {
+    const userString = await redis.hgetAsync('socketUser', socket.id);
+    errorLog.error(
+      `[recive Error] ${new Date().toLocaleString()}:${
+        err.message
+      } who: ${userString}`
+    );
+  });
 };
 
 process.on('exit', code => {

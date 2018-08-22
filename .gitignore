@@ -27,3 +27,4 @@ yarn.lock
 
 /src/config/secret*
 /log
+/db

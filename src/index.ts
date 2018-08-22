@@ -5,8 +5,10 @@ import { values } from 'lodash';
 import * as events from './modules/events';
 import * as middlewares from './modules/middleware';
 const { initPlay, ...other } = events;
+
 const server = createServer();
 let init = false;
+
 const io = socket(server, {
   serveClient: false,
   origins: '*:*',
