@@ -52,7 +52,6 @@ export const disconnect = (socket: Socket) => {
 
 export const selectSong = (socket: Socket) => {
   socket.on('selectSong', async (data: Song) => {
-    const userString = await redis.hgetAsync('socketUser', socket.id);
     https.get(data.url, resp => {
       if (resp.headers.location === 'http://music.163.com/404') {
         socket.emit('songError', data.name);
@@ -87,7 +86,7 @@ export const sendMessage = (socket: Socket) => {
     const msg = { ...message, time: new Date().toLocaleString() };
     redis.lpush('chatMessage', JSON.stringify(msg));
 
-    db.insert(message, err => {
+    db.insert(message, (err?: Error) => {
       if (err) {
         errorLog.error(
           `[存储信息失败] ${new Date().toLocaleString()}:${err.message}`
@@ -169,7 +168,7 @@ const leave = async (socket: Socket, type: 'disconnect' | 'userLeave') => {
     await redis.sremAsync('connectedUsers', userString);
     const user = JSON.parse(userString);
     socket.to('public').emit('userLeave', user.name);
-    info('userLeave', user.name);
+    info(type, user.name);
   }
   syncUser(socket);
 };
